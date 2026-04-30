@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 120" role="img" aria-labelledby="title desc">
+  <title id="title">Wafers Please Logo</title>
+  <desc id="desc">Retro industrial badge style logo for Wafers Please.</desc>
+  <defs>
+    <linearGradient id="plate" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#274863"/>
+      <stop offset="1" stop-color="#14273a"/>
+    </linearGradient>
+    <linearGradient id="stripe" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#8dc3e5"/>
+      <stop offset="0.5" stop-color="#4c7da8"/>
+      <stop offset="1" stop-color="#8dc3e5"/>
+    </linearGradient>
+  </defs>
+  <rect x="2" y="2" width="476" height="116" rx="12" fill="url(#plate)" stroke="#3f6b8b" stroke-width="3"/>
+  <rect x="12" y="12" width="456" height="18" rx="4" fill="url(#stripe)" opacity="0.95"/>
+  <rect x="12" y="90" width="456" height="18" rx="4" fill="url(#stripe)" opacity="0.95"/>
+  <circle cx="58" cy="60" r="28" fill="#89b0cc" stroke="#d6edff" stroke-width="3"/>
+  <circle cx="58" cy="60" r="20" fill="none" stroke="#d6edff" stroke-width="1.5" opacity="0.65"/>
+  <path d="M38 60h40M58 40v40" stroke="#d6edff" stroke-width="1.5" opacity="0.5"/>
+  <text x="98" y="57" fill="#eff8ff" font-size="33" font-family="Inter,Segoe UI,Arial,sans-serif" font-weight="800" letter-spacing="1.5">WAFERS</text>
+  <text x="98" y="87" fill="#9fd4f2" font-size="24" font-family="Inter,Segoe UI,Arial,sans-serif" font-weight="700" letter-spacing="3">PLEASE</text>
+</svg>
