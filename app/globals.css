@@ -312,6 +312,14 @@ button:focus-visible {
   display: block;
 }
 
+/* Force-hide A-Frame fullscreen/VR entry button. */
+.scene-wrap .a-enter-vr,
+.scene-wrap .a-enter-vr-button {
+  display: none !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
 .scene-reticle {
   position: absolute;
   left: 50%;
