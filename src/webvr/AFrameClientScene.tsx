@@ -89,7 +89,7 @@ export default function AFrameClientScene() {
     <div className="scene-wrap" aria-label="3D inspection station scene" ref={wrapRef}>
       {h("a-scene", {
         embedded: true,
-        "vr-mode-ui": "enabled: true",
+        "vr-mode-ui": "enabled: false",
         renderer: "colorManagement: true; antialias: true; physicallyCorrectLights: true; toneMapping: ACESFilmic; exposure: 1.08; sortObjects: true"
       }, [
         h("a-sky", { color: "#1d3244", key: "sky" }),
