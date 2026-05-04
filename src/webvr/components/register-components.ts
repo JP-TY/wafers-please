@@ -69,7 +69,7 @@ export function registerAFrameComponents(): void {
 
   AFRAME.registerComponent("vr-thumbstick-locomotion", {
     schema: {
-      speed: { type: "number", default: 0.72 },
+      speed: { type: "number", default: 0.34 },
       deadzone: { type: "number", default: 0.18 }
     },
     tick(_time: number, dt: number) {

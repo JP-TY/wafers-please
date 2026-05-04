@@ -197,8 +197,8 @@ export default function AFrameClientScene() {
           {
             id: "xr-locomotion-rig",
             position: "0 0 0",
-            "vr-thumbstick-locomotion": "speed: 0.72; deadzone: 0.18",
-            "wasd-controls": `enabled: ${wasdEnabled}; acceleration: 5.5`,
+            "vr-thumbstick-locomotion": "speed: 0.34; deadzone: 0.18",
+            "wasd-controls": `enabled: ${wasdEnabled}; acceleration: 3`,
             key: "xr-rig"
           },
           [
