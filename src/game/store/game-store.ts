@@ -14,12 +14,22 @@ import {
 import { createAccumulator, applyJudgement, finalizeShift } from "@/game/engine/scoring";
 import { generateWaferCase } from "@/game/engine/simulation";
 import { fixToolByDefect, type FixTool, type InspectionTool } from "@/game/inspection-tools";
-import type { DayRuleConfig, Disposition, FixMiniGameState, ShiftResult, WaferCase } from "@/game/types";
+import type {
+  DayRuleConfig,
+  Disposition,
+  FixMiniGameState,
+  PlayModePreference,
+  SessionPhase,
+  ShiftResult,
+  WaferCase
+} from "@/game/types";
 
 type Phase = "running" | "ended";
 type FixPhase = "idle" | "quiz" | "mini_game" | "applied";
 
 interface GameState {
+  sessionPhase: SessionPhase;
+  playModePreference: PlayModePreference | null;
   currentDay: number;
   currentRules: DayRuleConfig;
   phase: Phase;
@@ -54,6 +64,7 @@ interface GameState {
   setSelectedFixTool: (tool: FixTool) => void;
   clearToolPickupNotice: () => void;
   startFixQuiz: () => void;
+  cancelFixQuiz: () => void;
   submitFixQuizAttempt: (isCorrect: boolean) => void;
   startFixMiniGame: () => void;
   tickFixMiniGame: (nowMs: number) => void;
@@ -68,6 +79,7 @@ interface GameState {
   actOnWafer: (action: Disposition) => void;
   advanceToNextDay: () => void;
   resetShift: () => void;
+  beginSession: (playMode: PlayModePreference) => void;
 }
 
 const initialSeed = "day-default-seed";
@@ -97,6 +109,8 @@ const bootSeed = makeRandomSeed();
 const bootRules = getDayRules(1);
 
 export const useGameStore = create<GameState>((set, get) => ({
+  sessionPhase: "menu",
+  playModePreference: null,
   currentDay: 1,
   currentRules: bootRules,
   phase: "running",
@@ -123,8 +137,14 @@ export const useGameStore = create<GameState>((set, get) => ({
     completedInspection: false,
     submittedDisposition: false
   },
+  beginSession: (playMode) => {
+    set({ sessionPhase: "playing", playModePreference: playMode });
+  },
   setElapsedSeconds: (seconds) => {
     const state = get();
+    if (state.sessionPhase !== "playing") {
+      return;
+    }
     if (state.phase === "ended") {
       return;
     }
@@ -136,17 +156,20 @@ export const useGameStore = create<GameState>((set, get) => ({
     set({ elapsedSeconds: seconds });
   },
   openInspection: () => {
-    if (get().phase !== "running") return;
+    const state = get();
+    if (state.sessionPhase !== "playing" || state.phase !== "running") return;
     set((state) => ({
       inspectionOpen: true,
       tutorialMilestones: { ...state.tutorialMilestones, openedInspection: true }
     }));
   },
   closeInspection: () => {
+    if (get().sessionPhase !== "playing") return;
     set({ inspectionOpen: false });
   },
   completeInspection: () => {
-    if (get().phase !== "running") return;
+    const state = get();
+    if (state.sessionPhase !== "playing" || state.phase !== "running") return;
     set((state) => ({
       hasInspectedCurrent: true,
       inspectionOpen: false,
@@ -154,6 +177,7 @@ export const useGameStore = create<GameState>((set, get) => ({
     }));
   },
   setSelectedTool: (tool) => {
+    if (get().sessionPhase !== "playing") return;
     set((state) => ({
       selectedTool: tool,
       toolPickupNotice: `${tool.charAt(0).toUpperCase()}${tool.slice(1)} tool selected`,
@@ -161,6 +185,7 @@ export const useGameStore = create<GameState>((set, get) => ({
     }));
   },
   setSelectedFixTool: (tool) => {
+    if (get().sessionPhase !== "playing") return;
     const readable = tool
       .split("-")
       .map((part) => `${part.charAt(0).toUpperCase()}${part.slice(1)}`)
@@ -175,12 +200,18 @@ export const useGameStore = create<GameState>((set, get) => ({
     set({ toolPickupNotice: null });
   },
   startFixQuiz: () => {
-    if (get().phase !== "running") return;
+    const state = get();
+    if (state.sessionPhase !== "playing" || state.phase !== "running") return;
     set({ fixPhase: "quiz" });
+  },
+  cancelFixQuiz: () => {
+    const state = get();
+    if (state.sessionPhase !== "playing" || state.fixPhase !== "quiz") return;
+    set({ fixPhase: "idle" });
   },
   submitFixQuizAttempt: (isCorrect) => {
     const state = get();
-    if (state.phase !== "running") return;
+    if (state.sessionPhase !== "playing" || state.phase !== "running") return;
     const accumulator = { ...state.accumulator };
     if (!isCorrect) {
       accumulator.fixQuizFailures += 1;
@@ -195,7 +226,7 @@ export const useGameStore = create<GameState>((set, get) => ({
   },
   startFixMiniGame: () => {
     const state = get();
-    if (state.phase !== "running") return;
+    if (state.sessionPhase !== "playing" || state.phase !== "running") return;
     set({
       fixPhase: "mini_game",
       fixMiniGame: buildFixMiniGame(state.selectedFixTool, state.currentWafer, `${state.seed}-${state.waferIndex}`, Date.now())
@@ -203,7 +234,7 @@ export const useGameStore = create<GameState>((set, get) => ({
   },
   tickFixMiniGame: (nowMs) => {
     const state = get();
-    if (state.phase !== "running" || !state.fixMiniGame) return;
+    if (state.sessionPhase !== "playing" || state.phase !== "running" || !state.fixMiniGame) return;
     const next = tickFixMiniGame(state.fixMiniGame, nowMs);
     set({
       fixMiniGame: next,
@@ -212,27 +243,28 @@ export const useGameStore = create<GameState>((set, get) => ({
   },
   registerFixMiniGameHit: (targetId, detail) => {
     const state = get();
-    if (state.phase !== "running" || !state.fixMiniGame) return;
+    if (state.sessionPhase !== "playing" || state.phase !== "running" || !state.fixMiniGame) return;
     const next = registerFixMiniGameHit(state.fixMiniGame, targetId, detail);
     set({ fixMiniGame: next });
   },
   registerFixMiniGameMiss: (reason) => {
     const state = get();
-    if (state.phase !== "running" || !state.fixMiniGame) return;
+    if (state.sessionPhase !== "playing" || state.phase !== "running" || !state.fixMiniGame) return;
     set({ fixMiniGame: registerFixMiniGameMiss(state.fixMiniGame, reason) });
   },
   completeToolStep: () => {
     const state = get();
-    if (state.phase !== "running" || !state.fixMiniGame) return;
+    if (state.sessionPhase !== "playing" || state.phase !== "running" || !state.fixMiniGame) return;
     set({ fixMiniGame: completeToolStep(state.fixMiniGame) });
   },
   failToolStep: (reason) => {
     const state = get();
-    if (state.phase !== "running" || !state.fixMiniGame) return;
+    if (state.sessionPhase !== "playing" || state.phase !== "running" || !state.fixMiniGame) return;
     set({ fixMiniGame: failToolStep(state.fixMiniGame, reason) });
   },
   abortMiniGame: () => {
-    if (get().phase !== "running") return;
+    const state = get();
+    if (state.sessionPhase !== "playing" || state.phase !== "running") return;
     set({
       fixPhase: "quiz",
       fixMiniGame: null,
@@ -241,7 +273,7 @@ export const useGameStore = create<GameState>((set, get) => ({
   },
   completeFixMiniGame: () => {
     const state = get();
-    if (state.phase !== "running") return;
+    if (state.sessionPhase !== "playing" || state.phase !== "running") return;
     if (!state.fixMiniGame || state.fixMiniGame.phase !== "success") {
       set({ toolPickupNotice: "Complete the tool mini-game successfully before applying fix." });
       return;
@@ -250,7 +282,7 @@ export const useGameStore = create<GameState>((set, get) => ({
   },
   applyFix: () => {
     const state = get();
-    if (state.phase !== "running") {
+    if (state.sessionPhase !== "playing" || state.phase !== "running") {
       return;
     }
     if (!state.currentWafer.reworkEligible) {
@@ -286,7 +318,7 @@ export const useGameStore = create<GameState>((set, get) => ({
   },
   actOnWafer: (action) => {
     const state = get();
-    if (state.phase !== "running") {
+    if (state.sessionPhase !== "playing" || state.phase !== "running") {
       return;
     }
     const requiredFixTools = getRequiredFixToolsForWafer(state.currentWafer);
@@ -340,6 +372,8 @@ export const useGameStore = create<GameState>((set, get) => ({
     const nextRules = getDayRules(nextDay);
     const seed = makeRandomSeed();
     set({
+      sessionPhase: "playing",
+      playModePreference: state.playModePreference,
       currentDay: nextDay,
       currentRules: nextRules,
       phase: "running",
@@ -372,6 +406,8 @@ export const useGameStore = create<GameState>((set, get) => ({
     const nextRules = getDayRules(1);
     const seed = makeRandomSeed();
     set({
+      sessionPhase: "playing",
+      playModePreference: get().playModePreference,
       currentDay: 1,
       currentRules: nextRules,
       phase: "running",

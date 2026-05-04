@@ -17,6 +17,83 @@
   box-sizing: border-box;
 }
 
+.start-menu-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 2147483640;
+  display: grid;
+  place-items: center;
+  padding: 1.25rem;
+  background: radial-gradient(900px 520px at 50% 20%, rgb(22 58 88 / 55%), rgb(4 10 16 / 88%));
+  backdrop-filter: blur(6px);
+}
+
+.start-menu-card {
+  width: min(520px, 100%);
+  border: 1px solid var(--panel-border);
+  border-radius: 0.85rem;
+  padding: 1.35rem 1.45rem 1.25rem;
+  background:
+    linear-gradient(180deg, rgb(255 255 255 / 5%), transparent 28%),
+    linear-gradient(155deg, #132a40, #0a1624);
+  box-shadow: 0 22px 50px rgb(0 0 0 / 55%);
+}
+
+.start-menu-eyebrow {
+  margin: 0 0 0.35rem;
+}
+
+.start-menu-title {
+  margin: 0 0 0.5rem;
+  font-size: clamp(1.65rem, 4vw, 2.1rem);
+  letter-spacing: 0.02em;
+}
+
+.start-menu-lede {
+  margin: 0 0 0.75rem;
+  color: var(--muted);
+  line-height: 1.45;
+  font-size: 0.98rem;
+}
+
+.start-menu-bullets {
+  margin: 0 0 1rem;
+  padding-left: 1.15rem;
+  color: #c6def1;
+  font-size: 0.9rem;
+  line-height: 1.45;
+  display: grid;
+  gap: 0.35rem;
+}
+
+.start-menu-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+  margin-bottom: 0.75rem;
+}
+
+.start-menu-btn {
+  flex: 1 1 200px;
+  min-height: 2.65rem;
+  font-size: 0.95rem;
+}
+
+.start-menu-btn-primary {
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--panel-border));
+}
+
+.start-menu-btn-secondary {
+  border-color: color-mix(in srgb, var(--ok) 45%, var(--panel-border));
+}
+
+.start-menu-footnote {
+  margin: 0;
+  font-size: 0.78rem;
+  color: #8fa9bd;
+  line-height: 1.4;
+}
+
 html,
 body {
   margin: 0;
@@ -70,6 +147,281 @@ button:focus-visible {
   position: relative;
   padding: 0.9rem;
   height: 100vh;
+}
+
+/* WebXR DOM overlay host on document.body (see app/layout.tsx + A-Frame overlayElement). */
+#vr-dom-ui-root.vr-dom-ui-root--body {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  max-width: 100vw;
+  height: 100%;
+  min-height: 100dvh;
+  z-index: 2147482640;
+  pointer-events: none;
+  isolation: isolate;
+}
+
+.vr-dom-ui-root .hud-strip,
+.vr-dom-ui-root .tutorial-shell,
+.vr-dom-ui-root .tutorial-mini-guide,
+.vr-dom-ui-root .overlay-modal,
+.vr-dom-ui-root .fix-quiz-overlay,
+.vr-dom-ui-root .fix-mini-game-overlay {
+  pointer-events: auto;
+}
+
+/* WebXR session: larger typography, laser-friendly targets, readable DOM overlay. */
+#vr-dom-ui-root.vr-dom-ui-root--xr {
+  font-size: clamp(16px, 2.6vmin, 22px);
+  line-height: 1.35;
+}
+
+.vr-dom-ui-root--xr .hud-strip--xr {
+  left: 0.75rem;
+  right: 0.75rem;
+  top: 0.65rem;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.45rem;
+  max-height: 42vh;
+  overflow-y: auto;
+  padding: 0.55rem 0.65rem;
+}
+
+.vr-dom-ui-root--xr .hud-grid--xr {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.45rem;
+}
+
+.vr-dom-ui-root--xr .hud-grid--xr .status-chip,
+.vr-dom-ui-root--xr .hud-grid--xr .panel-subtag {
+  font-size: 0.82rem;
+  padding: 0.35rem 0.55rem;
+  justify-content: center;
+  text-align: center;
+}
+
+.vr-dom-ui-root--xr .hud-help--xr {
+  display: flex !important;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  max-width: none;
+  justify-content: flex-start;
+}
+
+.vr-dom-ui-root--xr .hud-help--xr .panel-subtag {
+  font-size: 0.78rem;
+  padding: 0.28rem 0.5rem;
+}
+
+.vr-dom-ui-root--xr .tutorial-shell--xr {
+  top: auto;
+  bottom: 0.65rem;
+  left: 0.65rem;
+  right: 0.65rem;
+  transform: none;
+  width: auto;
+  max-width: none;
+}
+
+.vr-dom-ui-root--xr .tutorial-card--xr {
+  max-height: min(46vh, 520px);
+  overflow-y: auto;
+  padding: 0.85rem 1rem;
+}
+
+.vr-dom-ui-root--xr .tutorial-card--xr h3 {
+  font-size: 1.25rem;
+}
+
+.vr-dom-ui-root--xr .tutorial-actions--xr {
+  flex-wrap: wrap;
+  justify-content: stretch;
+  gap: 0.55rem;
+}
+
+.vr-dom-ui-root--xr .tutorial-actions--xr button {
+  min-height: 3rem;
+  min-width: min(160px, 44vw);
+  flex: 1 1 auto;
+  font-size: 1rem;
+}
+
+.vr-dom-ui-root--xr .tutorial-mini-guide--xr {
+  left: 0.65rem;
+  right: 0.65rem;
+  bottom: 0.55rem;
+  padding: 0.5rem 0.65rem;
+  font-size: 0.95rem;
+}
+
+.vr-dom-ui-root--xr .tutorial-mini-guide--xr button {
+  min-height: 2.75rem;
+  padding: 0.35rem 0.85rem;
+}
+
+.overlay-modal--xr {
+  padding: 0.4rem;
+  align-items: flex-start;
+  padding-top: 0.75rem;
+}
+
+.debrief-card--xr {
+  width: min(1120px, 98vw);
+  max-height: 92vh;
+  overflow-y: auto;
+  padding: 1.1rem 1.2rem;
+}
+
+.debrief-card--xr h2 {
+  font-size: 1.45rem;
+}
+
+.debrief-card--xr .inline-row {
+  flex-direction: column;
+}
+
+.debrief-card--xr .inline-row button {
+  width: 100%;
+  min-height: 3.25rem;
+  font-size: 1.05rem;
+}
+
+.inspect-card--xr {
+  width: min(1180px, 99vw);
+  max-height: 94vh;
+  overflow: hidden;
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
+}
+
+.inspect-controls--xr {
+  flex-wrap: wrap;
+  gap: 0.55rem;
+}
+
+.inspect-tool-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.45rem;
+  width: 100%;
+  border: 1px solid color-mix(in srgb, var(--panel-border) 75%, transparent);
+  border-radius: 0.55rem;
+  padding: 0.45rem 0.5rem 0.55rem;
+  background: rgb(10 24 38 / 55%);
+}
+
+.inspect-tool-grid-label {
+  grid-column: 1 / -1;
+}
+
+.inspect-tool-tile {
+  min-height: 3.1rem;
+  font-size: 0.95rem;
+  padding: 0.45rem 0.5rem;
+}
+
+.inspect-grid--xr {
+  grid-template-columns: 1fr;
+  gap: 0.65rem;
+  min-height: 0;
+}
+
+.inspect-grid--xr .inspect-viewport--xr {
+  height: min(42vh, 380px);
+  min-height: 260px;
+  order: 1;
+}
+
+.inspect-grid--xr .inspect-findings {
+  order: 2;
+  max-height: min(34vh, 320px);
+  font-size: 0.95rem;
+}
+
+.inspect-vr-nudges {
+  position: absolute;
+  left: 0.45rem;
+  bottom: 0.45rem;
+  z-index: 3;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  max-width: 52%;
+}
+
+.inspect-vr-nudges button {
+  min-width: 2.75rem;
+  min-height: 2.75rem;
+  font-size: 1.1rem;
+  padding: 0.2rem;
+}
+
+.inspect-card--xr .inspect-zoom-pad button {
+  min-width: 3rem;
+  min-height: 3rem;
+  font-size: 1.35rem;
+}
+
+.inspect-footer--xr {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.55rem;
+}
+
+.inspect-footer-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  justify-content: flex-end;
+}
+
+.inspect-footer-actions--xr {
+  flex-direction: column;
+}
+
+.inspect-footer-actions--xr button {
+  width: 100%;
+  min-height: 3.2rem;
+  font-size: 1.02rem;
+}
+
+.fix-quiz-overlay--xr,
+.fix-mini-game-overlay--xr {
+  padding: 0.35rem;
+}
+
+.fix-quiz-card--xr {
+  width: min(1080px, 99vw);
+  max-height: 92vh;
+  padding: 0.85rem 1rem;
+}
+
+.fix-quiz-card--xr .fix-quiz-options {
+  gap: 0.5rem;
+}
+
+.fix-quiz-option {
+  text-align: left;
+}
+
+.fix-quiz-option--xr {
+  min-height: 3.5rem;
+  padding: 0.55rem 0.65rem;
+  font-size: 0.88rem;
+  line-height: 1.3;
+  white-space: normal;
+}
+
+.fix-mini-game-card--xr {
+  width: min(1080px, 99vw);
+  max-height: 90vh;
+}
+
+.fix-mini-game-card--xr .tool-mini-game-board {
+  min-height: 240px;
 }
 
 .game-stage .scene-wrap {
@@ -299,6 +651,7 @@ button:focus-visible {
 
 .scene-wrap {
   position: relative;
+  z-index: 1;
   border: 1px solid var(--panel-border);
   border-radius: 0.75rem;
   overflow: hidden;
@@ -312,12 +665,9 @@ button:focus-visible {
   display: block;
 }
 
-/* Force-hide A-Frame fullscreen/VR entry button. */
-.scene-wrap .a-enter-vr,
-.scene-wrap .a-enter-vr-button {
-  display: none !important;
-  visibility: hidden !important;
-  pointer-events: none !important;
+/* A-Frame WebXR entry control: keep above scene but below modals (debrief 60). */
+.scene-wrap .a-enter-vr {
+  z-index: 45;
 }
 
 .scene-reticle {

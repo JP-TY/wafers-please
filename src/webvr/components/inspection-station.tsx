@@ -1,5 +1,6 @@
 import type { WaferCase } from "@/game/types";
 import { getWaferVisuals } from "@/webvr/components/wafer-entity";
+import { VR_HIT_CLASSES } from "@/webvr/vr-native/vr-layout-constants";
 import { createElement as h, useState } from "react";
 
 export function InspectionStation({
@@ -164,7 +165,7 @@ export function InspectionStation({
         metalness: "0.4",
         roughness: "0.5",
         "wafer-spin": "speed: 0.1",
-        class: "clickable",
+        class: VR_HIT_CLASSES,
         "hover-glint": "",
         shadow: "cast: true; receive: true",
         onMouseEnter: () => setHoverHint("Inspect wafer surface"),
@@ -178,7 +179,7 @@ export function InspectionStation({
         src: "/assets/textures/wafer-grid.svg",
         opacity: "0.92",
         transparent: "true",
-        class: "clickable",
+        class: VR_HIT_CLASSES,
         "hover-glint": "",
         shadow: "cast: true; receive: true",
         onMouseEnter: () => setHoverHint("Inspect wafer surface"),
@@ -244,7 +245,7 @@ export function InspectionStation({
         material: "emissive: #1d4fd1; emissiveIntensity: 0.26",
         src: "/assets/textures/rubber-pad.svg",
         rotation: "90 0 0",
-        class: "clickable pressable",
+        class: `${VR_HIT_CLASSES} pressable`,
         "hover-glint": "",
         "animation__press": "property: position; to: -1.75 1.11 -1.46; dir: alternate; dur: 120; startEvents: click",
         onMouseEnter: () => setHoverHint("Open inspection workbench"),
@@ -256,7 +257,7 @@ export function InspectionStation({
         radius: "0.2",
         height: "0.24",
         rotation: "90 0 0",
-        class: "clickable",
+        class: VR_HIT_CLASSES,
         material: "opacity: 0.01; transparent: true; side: double",
         onClick: onInspect
       })}
@@ -270,7 +271,7 @@ export function InspectionStation({
         material: "emissive: #8a670f; emissiveIntensity: 0.24",
         src: "/assets/textures/rubber-pad.svg",
         rotation: "90 0 0",
-        class: "clickable pressable",
+        class: `${VR_HIT_CLASSES} pressable`,
         "hover-glint": "",
         "animation__press": "property: position; to: -0.58 1.11 -1.46; dir: alternate; dur: 120; startEvents: click",
         onMouseEnter: () => setHoverHint("Apply manual fix with selected tool"),
@@ -282,7 +283,7 @@ export function InspectionStation({
         radius: "0.2",
         height: "0.24",
         rotation: "90 0 0",
-        class: "clickable",
+        class: VR_HIT_CLASSES,
         material: "opacity: 0.01; transparent: true; side: double",
         onClick: onRework
       })}
@@ -301,7 +302,7 @@ export function InspectionStation({
         material: "emissive: #1e6e3f; emissiveIntensity: 0.24",
         src: "/assets/textures/rubber-pad.svg",
         rotation: "90 0 0",
-        class: "clickable pressable",
+        class: `${VR_HIT_CLASSES} pressable`,
         "hover-glint": "",
         "animation__press": "property: position; to: 0.58 1.11 -1.46; dir: alternate; dur: 120; startEvents: click",
         onMouseEnter: () => setHoverHint("Accept wafer"),
@@ -313,7 +314,7 @@ export function InspectionStation({
         radius: "0.2",
         height: "0.24",
         rotation: "90 0 0",
-        class: "clickable",
+        class: VR_HIT_CLASSES,
         material: "opacity: 0.01; transparent: true; side: double",
         onClick: onAccept
       })}
@@ -332,7 +333,7 @@ export function InspectionStation({
         material: "emissive: #7e2334; emissiveIntensity: 0.24",
         src: "/assets/textures/rubber-pad.svg",
         rotation: "90 0 0",
-        class: "clickable pressable",
+        class: `${VR_HIT_CLASSES} pressable`,
         "hover-glint": "",
         "animation__press": "property: position; to: 1.75 1.11 -1.46; dir: alternate; dur: 120; startEvents: click",
         onMouseEnter: () => setHoverHint("Reject wafer"),
@@ -344,7 +345,7 @@ export function InspectionStation({
         radius: "0.2",
         height: "0.24",
         rotation: "90 0 0",
-        class: "clickable",
+        class: VR_HIT_CLASSES,
         material: "opacity: 0.01; transparent: true; side: double",
         onClick: onReject
       })}

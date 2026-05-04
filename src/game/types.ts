@@ -8,6 +8,12 @@ export type DefectClass =
 
 export type Disposition = "accept" | "reject" | "rework";
 
+/** How the player chose to run the shift from the start menu. */
+export type PlayModePreference = "desktop" | "vr";
+
+/** Gate gameplay until the player starts from the menu. */
+export type SessionPhase = "menu" | "playing";
+
 export type FixMiniGamePhase = "idle" | "active" | "success" | "failed";
 
 export interface FixMiniGameTarget {

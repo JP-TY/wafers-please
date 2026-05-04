@@ -1,34 +1,17 @@
 "use client";
 
-import { useEffect } from "react";
 import { useGameStore } from "@/game/store/game-store";
 import { LaserTrimMiniGame } from "@/ui/inspection/LaserTrimMiniGame";
 import { MicroPolishMiniGame } from "@/ui/inspection/MicroPolishMiniGame";
 import { PlasmaCleanMiniGame } from "@/ui/inspection/PlasmaCleanMiniGame";
+import { useFixMiniGameSuccessApply, useFixMiniGameTick } from "@/ui/inspection/use-fix-mini-game-tick";
 
 export function FixMiniGameHost() {
   const miniGame = useGameStore((s) => s.fixMiniGame);
-  const tick = useGameStore((s) => s.tickFixMiniGame);
-  const completeFixMiniGame = useGameStore((s) => s.completeFixMiniGame);
   const abortMiniGame = useGameStore((s) => s.abortMiniGame);
 
-  useEffect(() => {
-    if (!miniGame || miniGame.phase !== "active") return;
-    let frameId = 0;
-    const run = () => {
-      tick(Date.now());
-      frameId = window.requestAnimationFrame(run);
-    };
-    frameId = window.requestAnimationFrame(run);
-    return () => window.cancelAnimationFrame(frameId);
-  }, [miniGame, tick]);
-
-  useEffect(() => {
-    if (!miniGame) return;
-    if (miniGame.phase === "success") {
-      completeFixMiniGame();
-    }
-  }, [completeFixMiniGame, miniGame]);
+  useFixMiniGameTick();
+  useFixMiniGameSuccessApply();
 
   if (!miniGame) return null;
   const toolTitle =
@@ -67,13 +50,6 @@ export function FixMiniGameHost() {
         <div className="fix-mini-game-actions">
           <button type="button" onClick={abortMiniGame}>
             Restart Fix Quiz
-          </button>
-        </div>
-      ) : null}
-      {miniGame.phase === "success" ? (
-        <div className="fix-mini-game-actions">
-          <button type="button" onClick={completeFixMiniGame}>
-            Apply Fix Now
           </button>
         </div>
       ) : null}

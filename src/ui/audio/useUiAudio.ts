@@ -2,7 +2,7 @@
 
 import { useCallback, useRef } from "react";
 
-type CueType = "soft" | "confirm" | "warn";
+export type CueType = "soft" | "confirm" | "warn";
 
 const cueMap: Record<CueType, { frequency: number; duration: number; gain: number }> = {
   soft: { frequency: 420, duration: 0.05, gain: 0.018 },

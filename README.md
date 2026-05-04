@@ -13,6 +13,7 @@ The project emphasizes training clarity and repeatability over high-fidelity ind
 
 ## Features (Current Vertical Slice)
 
+- Start menu to choose **desktop** or **headset (WebXR)** before the shift begins.
 - Single playable shift loop with end-of-shift debrief.
 - Deterministic defect generation for reproducible scenarios.
 - Dual progression gates:
@@ -75,6 +76,25 @@ Open `http://localhost:3000`.
 - Runtime target is desktop browser first.
 - A-Frame stack keeps a path open for optional WebXR expansion.
 - Current MVP uses lightweight/procedural visuals for rapid iteration.
+
+## Testing WebXR without a headset
+
+1. Use **Chromium** (Chrome or Edge).
+2. Install the Chrome extension **[WebXR API Emulator](https://chromewebstore.google.com/detail/webxr-api-emulator/mjddjgeghkdiejedbbfngjacefkjnaab)** (or search the store for that name).
+3. Open DevTools (**F12**), find the **WebXR** panel, pick a device (for example **Oculus Quest 2**), and enable emulation.
+4. Run the app on **`http://localhost:3000`** (or HTTPS in production).
+5. From the start menu choose **Play in headset (WebXR)**. Use **Enter VR** in the corner if the session does not start automatically.
+
+Headset UI (HUD, tutorial, inspection, debrief) uses the **WebXR DOM Overlay** API via A-Frame’s `overlayElement` on `#vr-dom-ui-root`. If your browser does not grant `dom-overlay`, 2D panels may only appear on the desktop mirror, not inside the emulated headset view.
+
+### WebXR controls (in headset)
+
+- **Move**: push either controller **thumbstick** forward/back/side to slide along the floor (relative to where you are looking horizontally).
+- **Look**: turn your head (and use **Enter VR** / browser UI to exit immersive mode when finished).
+- **3D station** (Inspect / Fix / Accept / Reject): point either controller **laser** at the highlighted controls and press the **trigger** (or primary click) to select.
+- **2D panels** (microscope workbench, quizzes, debrief): interact through the **DOM overlay** the same way—laser at buttons or, where supported, direct touch on the overlay.
+
+When you start with **Play in headset (WebXR)**, the DOM overlay uses a **VR layout**: larger HUD chips, bottom-anchored tutorial with big buttons, full-width debrief actions, and a microscope panel with **tool tiles** (instead of dropdowns), **pointer-based wafer drag** (works with the laser), **Pan mode**, and **rotate nudge** buttons. Quiz answers use tall, multi-line targets sized for laser selection.
 
 ## Roadmap (Post-MVP)
 

@@ -8,6 +8,7 @@ export function DebriefModal() {
   const result = useGameStore((s) => s.result);
   const advanceToNextDay = useGameStore((s) => s.advanceToNextDay);
   const resetShift = useGameStore((s) => s.resetShift);
+  const isVrUi = useGameStore((s) => s.playModePreference === "vr");
 
   if (!result) {
     return null;
@@ -22,8 +23,8 @@ export function DebriefModal() {
     result.processed === 0 ? 0 : Math.round(((result.falseAccepts + result.falseRejects) / result.processed) * 100);
   const canAdvanceDay = currentDay < 3;
   return (
-    <div className="overlay-modal" role="dialog" aria-modal="true" aria-labelledby="debrief-title">
-      <div className="overlay-card">
+    <div className={`overlay-modal${isVrUi ? " overlay-modal--xr" : ""}`} role="dialog" aria-modal="true" aria-labelledby="debrief-title">
+      <div className={`overlay-card debrief-card${isVrUi ? " debrief-card--xr" : ""}`}>
         <h2 id="debrief-title">End of Day {currentDay} Debrief</h2>
         <p className={`status-chip ${pass ? "status-ok" : "status-bad"}`}>
           {pass ? "Shift Passed" : "Remediation Required"}

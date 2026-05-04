@@ -4,6 +4,16 @@ import { useMemo, useRef, useState, type CSSProperties } from "react";
 import { defectCatalog } from "@/game/config/defects";
 import { getDispositionGuidance } from "@/game/engine/decision-thresholds";
 import {
+  buildFixToolShuffle,
+  buildMechanismOptions,
+  buildReleaseOptions,
+  buildSequenceOptions,
+  evaluateFixQuizSubmission,
+  type FixQuizAnswers
+} from "@/game/engine/fix-quiz-option-sets";
+import { buildDefectMarkers } from "@/game/engine/inspection-defect-markers";
+import { computeInspectionConfidence } from "@/game/engine/inspection-confidence";
+import {
   fixToolByDefect,
   fixToolLabels,
   optimalToolByDefect,
@@ -13,41 +23,6 @@ import {
 } from "@/game/inspection-tools";
 import { useGameStore } from "@/game/store/game-store";
 import { FixMiniGameHost } from "@/ui/inspection/FixMiniGameHost";
-
-type QuizAnswers = {
-  tool: FixTool | null;
-  mechanism: string | null;
-  sequence: string | null;
-  release: string | null;
-};
-type QuizOption = {
-  id: string;
-  label: string;
-  rationale: string;
-  isCorrect: boolean;
-};
-
-function hashString(seed: string): number {
-  let hash = 2166136261;
-  for (let i = 0; i < seed.length; i += 1) {
-    hash ^= seed.charCodeAt(i);
-    hash = Math.imul(hash, 16777619);
-  }
-  return hash >>> 0;
-}
-
-function seeded(seed: string): number {
-  return (hashString(seed) % 10000) / 10000;
-}
-
-function shuffleDeterministic<T>(items: T[], seed: string): T[] {
-  const next = [...items];
-  for (let i = next.length - 1; i > 0; i -= 1) {
-    const j = Math.floor(seeded(`${seed}-${i}`) * (i + 1));
-    [next[i], next[j]] = [next[j] as T, next[i] as T];
-  }
-  return next;
-}
 
 export function InspectionModal() {
   const currentDay = useGameStore((s) => s.currentDay);
@@ -60,22 +35,26 @@ export function InspectionModal() {
   const selectedFixTool = useGameStore((s) => s.selectedFixTool);
   const setSelectedFixTool = useGameStore((s) => s.setSelectedFixTool);
   const startFixQuiz = useGameStore((s) => s.startFixQuiz);
+  const cancelFixQuiz = useGameStore((s) => s.cancelFixQuiz);
   const submitFixQuizAttempt = useGameStore((s) => s.submitFixQuizAttempt);
   const startFixMiniGame = useGameStore((s) => s.startFixMiniGame);
   const fixPhase = useGameStore((s) => s.fixPhase);
   const fixMiniGame = useGameStore((s) => s.fixMiniGame);
   const fixQuizAttemptsCurrent = useGameStore((s) => s.fixQuizAttemptsCurrent);
   const completedFixToolsCurrent = useGameStore((s) => s.completedFixToolsCurrent);
+  const playModePreference = useGameStore((s) => s.playModePreference);
+  const isVrUi = playModePreference === "vr";
 
   const [zoom, setZoom] = useState(1.1);
   const [rotation, setRotation] = useState({ x: 10, y: -20 });
   const [offset, setOffset] = useState({ x: 0, y: 0 });
   const [parallax, setParallax] = useState({ x: 0, y: 0 });
-  const dragRef = useRef<{ x: number; y: number } | null>(null);
+  const [vrPanMode, setVrPanMode] = useState(false);
+  const pointerDragRef = useRef<{ pointerId: number; x: number; y: number } | null>(null);
   const [isFixQuizOpen, setIsFixQuizOpen] = useState(false);
   const [quizError, setQuizError] = useState<string | null>(null);
   const [fixMiniGameError, setFixMiniGameError] = useState<string | null>(null);
-  const [quizAnswers, setQuizAnswers] = useState<QuizAnswers>({
+  const [quizAnswers, setQuizAnswers] = useState<FixQuizAnswers>({
     tool: null,
     mechanism: null,
     sequence: null,
@@ -154,169 +133,53 @@ export function InspectionModal() {
     }),
     [allDefects]
   );
-  const requiredThreshold = wafer.severity === 3 || wafer.defectClass === "bridge" || wafer.defectClass === "open" ? 78 : 64;
-  const zoomScore = Math.max(0, Math.min(30, Math.round((zoom - 0.8) * 20)));
-  const angleDelta = Math.abs(rotation.x - 10) + Math.abs(rotation.y + 20);
-  const angleScore = Math.min(18, Math.round(angleDelta / 4));
-  const signalScore = canRevealDefect ? Math.min(32, 8 + Math.round((visibleDefects.length / allDefects.length) * 24)) : 8;
-  const toolScore = tool === recommendedTool ? 20 : 5;
-  const inspectionConfidence = Math.min(100, zoomScore + angleScore + signalScore + toolScore);
-  const canMarkComplete = inspectionConfidence >= requiredThreshold;
-  const defectMarkers = useMemo(() => {
-    const count = Math.min(
-      8,
-      Math.max(
-        1,
-        wafer.defectLoad + wafer.secondaryDefects.length
-      )
-    );
-    return Array.from({ length: count }).map((_, index) => {
-      const defect = allDefects[index % allDefects.length];
-      const spread = defect.defectPattern === 4 ? 68 : defect.defectPattern === 3 ? 60 : defect.defectPattern === 2 ? 50 : 42;
-      const x = 50 + (seeded(`${wafer.id}-${defect.defectClass}-${index}-x`) - 0.5) * spread;
-      const y = 50 + (seeded(`${wafer.id}-${defect.defectClass}-${index}-y`) - 0.5) * spread;
-      const rot = Math.round(seeded(`${wafer.id}-${defect.defectClass}-${index}-r`) * 180 - 90);
-      const size =
-        defect.defectClass === "particle"
-          ? 10 + seeded(`${wafer.id}-${index}-s`) * 13
-          : defect.defectClass === "scratch"
-            ? 22 + seeded(`${wafer.id}-${index}-s`) * 30
-            : 18 + seeded(`${wafer.id}-${index}-s`) * 22;
-      const variant = ((index + wafer.defectPattern) % 3) + 1;
-      return { x, y, rot, size, variant, defectClass: defect.defectClass };
-    });
-  }, [allDefects, wafer.defectLoad, wafer.defectPattern, wafer.id, wafer.secondaryDefects.length]);
+  const { inspectionConfidence, requiredThreshold, canMarkComplete } = useMemo(
+    () =>
+      computeInspectionConfidence({
+        wafer,
+        zoom,
+        rotation,
+        canRevealDefect,
+        visibleDefectCount: visibleDefects.length,
+        totalDefectCount: allDefects.length,
+        tool,
+        recommendedTool
+      }),
+    [allDefects.length, canRevealDefect, recommendedTool, rotation, tool, visibleDefects.length, wafer, zoom]
+  );
+  const defectMarkers = useMemo(() => buildDefectMarkers(wafer, allDefects), [allDefects, wafer]);
   const visibleDefectClasses = useMemo(() => new Set(visibleDefects.map((defect) => defect.defectClass)), [visibleDefects]);
   const visibleMarkers = useMemo(
     () => defectMarkers.filter((marker) => visibleDefectClasses.has(marker.defectClass)),
     [defectMarkers, visibleDefectClasses]
   );
-  const mechanismOptions = useMemo<QuizOption[]>(() => {
-    const severeDefectPresent = caseContext.severeCount > 0;
-    const hasConnectivityRisk = caseContext.hasConnectivityRisk;
-    const correctLabel = hasConnectivityRisk
-      ? "Prioritize mechanism containment because unresolved connectivity signatures can cause latent downstream electrical fallout."
-      : severeDefectPresent
-        ? "Prioritize mechanism containment because unresolved high-severity signatures can collapse process margin and yield."
-        : "Prioritize mechanism containment because unresolved local signatures can propagate into downstream yield loss.";
-    const optionPool: QuizOption[] = [
-      {
-        id: "yield-and-reliability",
-        label: correctLabel,
-        rationale: "Mechanism-first control preserves yield and reliability.",
-        isCorrect: true
-      },
-      {
-        id: "throughput-dominates",
-        label: "Prioritize throughput over mechanism control when defect behavior appears operationally stable during inspection.",
-        rationale: "Near-miss: sounds practical but underweights latent risk.",
-        isCorrect: false
-      },
-      {
-        id: "single-view-confidence",
-        label: "Prioritize confidence in the strongest single view because secondary modes rarely change practical risk classification.",
-        rationale: "Near-miss: ignores cross-mode verification requirement.",
-        isCorrect: false
-      },
-      {
-        id: "downstream-screening",
-        label: "Prioritize downstream screening because front-end intervention has limited effect once signatures are clearly localized.",
-        rationale: "Near-miss: delays control too late in flow.",
-        isCorrect: false
-      }
-    ];
-    return shuffleDeterministic(optionPool, `${wafer.id}-mechanism-f-${fixQuizAttemptsCurrent}`);
-  }, [caseContext.hasConnectivityRisk, caseContext.severeCount, fixQuizAttemptsCurrent, wafer.id]);
-  const sequenceOptions = useMemo<QuizOption[]>(() => {
-    const sequenceFrames = [
-      `Verify in multiple views, align wafer, apply ${fixToolLabels[requiredFixTool]}, then re-verify stability before release.`,
-      `Cross-check signal first, execute ${fixToolLabels[requiredFixTool]} intervention, then confirm post-fix residual risk.`,
-      `Validate signature, perform controlled ${fixToolLabels[requiredFixTool]} action, and complete post-repair verification before disposition.`
-    ];
-    const optionPool: QuizOption[] = [
-      {
-        id: "verify-align-repair-reinspect",
-        label: sequenceFrames[Math.floor(seeded(`${wafer.id}-seq-frame`) * sequenceFrames.length)] as string,
-        rationale: "Correct sequence maintains process control.",
-        isCorrect: true
-      },
-      {
-        id: "repair-then-verify",
-        label: "Align and repair quickly first, then run a verification pass only if residual signatures are still obvious.",
-        rationale: "Near-miss: defers pre-fix verification.",
-        isCorrect: false
-      },
-      {
-        id: "single-mode-cycle",
-        label: "Use one stable view mode for pre/post checks to reduce interpretation drift between observation steps.",
-        rationale: "Near-miss: misses multi-view validation.",
-        isCorrect: false
-      },
-      {
-        id: "triage-then-queue",
-        label: "Perform light triage, queue repair as needed, and make disposition once throughput impact is acceptable.",
-        rationale: "Near-miss: weak control closure before decision.",
-        isCorrect: false
-      }
-    ];
-    return shuffleDeterministic(optionPool, `${wafer.id}-sequence-f-${fixQuizAttemptsCurrent}`);
-  }, [fixQuizAttemptsCurrent, requiredFixTool, wafer.id]);
-  const releaseOptions = useMemo<QuizOption[]>(() => {
-    const hasKiller = caseContext.severeCount > 0 || caseContext.hasConnectivityRisk;
-    const optionPool: QuizOption[] = [
-      {
-        id: hasKiller ? "reject-after-fix-check" : "accept-after-fix-check",
-        label: hasKiller
-          ? "Reject if high-risk signatures remain unstable after repair verification across inspection views."
-          : "Accept only when post-repair verification remains stable across inspection views and risk is resolved.",
-        rationale: "Disposition must follow post-fix stability, not optimism.",
-        isCorrect: true
-      },
-      {
-        id: "accept-after-execution",
-        label: "Accept after successful repair execution when no immediate anomaly escalation appears during the same pass.",
-        rationale: "Near-miss: execution alone is insufficient.",
-        isCorrect: false
-      },
-      {
-        id: "confidence-only-release",
-        label: "Release based on confidence threshold once cleared, since score integration captures the remaining uncertainty.",
-        rationale: "Near-miss: confidence is support signal, not sole rule.",
-        isCorrect: false
-      },
-      {
-        id: "conservative-default-reject",
-        label: "Reject by default after any manual intervention to avoid compounding process uncertainty at release.",
-        rationale: "Near-miss: over-conservative and ignores successful verification.",
-        isCorrect: false
-      }
-    ];
-    return shuffleDeterministic(optionPool, `${wafer.id}-release-f-${fixQuizAttemptsCurrent}`);
-  }, [caseContext.hasConnectivityRisk, caseContext.severeCount, fixQuizAttemptsCurrent, wafer.id]);
+  const mechanismOptions = useMemo(
+    () => buildMechanismOptions(wafer, caseContext, fixQuizAttemptsCurrent),
+    [caseContext, fixQuizAttemptsCurrent, wafer]
+  );
+  const sequenceOptions = useMemo(
+    () => buildSequenceOptions(wafer, requiredFixTool, fixQuizAttemptsCurrent),
+    [fixQuizAttemptsCurrent, requiredFixTool, wafer]
+  );
+  const releaseOptions = useMemo(
+    () => buildReleaseOptions(wafer, caseContext, fixQuizAttemptsCurrent),
+    [caseContext, fixQuizAttemptsCurrent, wafer]
+  );
   const fixToolOptions = useMemo(
-    () => shuffleDeterministic((Object.keys(fixToolLabels) as FixTool[]), `${wafer.id}-fixtool-${fixQuizAttemptsCurrent}`),
-    [fixQuizAttemptsCurrent, wafer.id]
+    () => buildFixToolShuffle(wafer, fixQuizAttemptsCurrent),
+    [fixQuizAttemptsCurrent, wafer]
   );
 
   const submitFixQuiz = () => {
-    const mechanismChoice = mechanismOptions.find((option) => option.id === quizAnswers.mechanism);
-    const sequenceChoice = sequenceOptions.find((option) => option.id === quizAnswers.sequence);
-    const releaseChoice = releaseOptions.find((option) => option.id === quizAnswers.release);
-    const isToolCorrect = quizAnswers.tool === requiredFixTool;
-    const isMechanismCorrect = Boolean(mechanismChoice?.isCorrect);
-    const isSequenceCorrect = Boolean(sequenceChoice?.isCorrect);
-    const isReleaseCorrect = Boolean(releaseChoice?.isCorrect);
-    const score =
-      Number(isToolCorrect) + Number(isMechanismCorrect) + Number(isSequenceCorrect) + Number(isReleaseCorrect);
-    const passedCritical = isToolCorrect && isReleaseCorrect;
-    const isCorrect = score >= 3 && passedCritical;
+    const { isCorrect, score, misses } = evaluateFixQuizSubmission({
+      quizAnswers,
+      mechanismOptions,
+      sequenceOptions,
+      releaseOptions,
+      requiredFixTool
+    });
     submitFixQuizAttempt(isCorrect);
     if (!isCorrect) {
-      const misses = [];
-      if (!isToolCorrect) misses.push("Tool competency miss: choose the repair tool that matches dominant mechanism.");
-      if (!isMechanismCorrect) misses.push("Risk competency miss: prioritize yield/reliability over throughput shortcuts.");
-      if (!isSequenceCorrect) misses.push("Sequence competency miss: keep verify-before and verify-after repair.");
-      if (!isReleaseCorrect) misses.push("Release competency miss: disposition must follow post-fix stability.");
       setQuizError(`Score ${score}/4. ${misses.join(" ")}`);
       return;
     }
@@ -345,9 +208,48 @@ export function InspectionModal() {
     return null;
   }
 
+  const onViewportPointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (isRepairInteractionLocked) return;
+    if (event.button !== 0) return;
+    event.currentTarget.setPointerCapture(event.pointerId);
+    pointerDragRef.current = { pointerId: event.pointerId, x: event.clientX, y: event.clientY };
+  };
+
+  const onViewportPointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
+    const rect = event.currentTarget.getBoundingClientRect();
+    const normX = (event.clientX - rect.left) / Math.max(1, rect.width) - 0.5;
+    const normY = (event.clientY - rect.top) / Math.max(1, rect.height) - 0.5;
+    setParallax({ x: normX * 10, y: normY * 8 });
+    if (isRepairInteractionLocked) return;
+    const drag = pointerDragRef.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    const dx = event.clientX - drag.x;
+    const dy = event.clientY - drag.y;
+    pointerDragRef.current = { pointerId: event.pointerId, x: event.clientX, y: event.clientY };
+    const panning = event.shiftKey || (isVrUi && vrPanMode);
+    if (panning) {
+      setOffset((prev) => ({ x: prev.x + dx * 0.25, y: prev.y + dy * 0.25 }));
+    } else {
+      setRotation((prev) => ({ x: prev.x + dy * 0.16, y: prev.y + dx * 0.16 }));
+    }
+  };
+
+  const onViewportPointerUp = (event: React.PointerEvent<HTMLDivElement>) => {
+    const drag = pointerDragRef.current;
+    if (drag && drag.pointerId === event.pointerId) {
+      pointerDragRef.current = null;
+      try {
+        event.currentTarget.releasePointerCapture(event.pointerId);
+      } catch {
+        /* already released */
+      }
+    }
+    setParallax({ x: 0, y: 0 });
+  };
+
   return (
-    <div className="overlay-modal" role="dialog" aria-modal="true" aria-labelledby="inspect-title">
-      <div className="overlay-card inspect-card">
+    <div className={`overlay-modal${isVrUi ? " overlay-modal--xr" : ""}`} role="dialog" aria-modal="true" aria-labelledby="inspect-title">
+      <div className={`overlay-card inspect-card${isVrUi ? " inspect-card--xr" : ""}`}>
         <div className="inspect-header">
           <div className="panel-head">
             <span className="panel-tag">Inspection Console</span>
@@ -355,87 +257,140 @@ export function InspectionModal() {
           </div>
           <h2 id="inspect-title">Microscope Workbench</h2>
           <p>
-            Drag to rotate. Hold <span className="kbd">Shift</span> + drag to pan. Scroll or buttons to zoom.
+            {isVrUi ? (
+              <>
+                <strong>WebXR:</strong> Press and hold on the wafer with your laser, then drag to rotate. Use{" "}
+                <strong>+ / −</strong> to zoom. Turn on <strong>Pan mode</strong> to drag-pan instead of rotate. Use the
+                nudge buttons if drag is awkward.
+              </>
+            ) : (
+              <>
+                Drag to rotate. Hold <span className="kbd">Shift</span> + drag to pan. Scroll or buttons to zoom.
+              </>
+            )}
           </p>
         </div>
-        <div className="inspect-controls">
-          <label className="tool-select">
-            <span className="panel-subtag">Viewing tool</span>
-            <select value={tool} onChange={(event) => setTool(event.target.value as InspectionTool)} className="a11y-select">
-              {(Object.keys(toolLabels) as InspectionTool[]).map((entry) => (
-                <option key={entry} value={entry}>
-                  {toolLabels[entry]}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="tool-select">
-            <span className="panel-subtag">Fix tool</span>
-            <select
-              value={selectedFixTool}
-              onChange={(event) => setSelectedFixTool(event.target.value as FixTool)}
-              className="a11y-select"
-              disabled={fixPhase === "mini_game"}
-            >
-              {(Object.keys(fixToolLabels) as FixTool[]).map((entry) => (
-                <option key={entry} value={entry}>
-                  {fixToolLabels[entry]}
-                </option>
-              ))}
-            </select>
-          </label>
+        <div className={`inspect-controls${isVrUi ? " inspect-controls--xr" : ""}`}>
+          {isVrUi ? (
+            <>
+              <div className="inspect-tool-grid" role="group" aria-label="Viewing tool">
+                <span className="panel-subtag inspect-tool-grid-label">Viewing tool</span>
+                {(Object.keys(toolLabels) as InspectionTool[]).map((entry) => (
+                  <button
+                    key={entry}
+                    type="button"
+                    className={tool === entry ? "inspect-tool-tile active-tool" : "inspect-tool-tile"}
+                    onClick={() => setTool(entry)}
+                  >
+                    {toolLabels[entry]}
+                  </button>
+                ))}
+              </div>
+              <div className="inspect-tool-grid" role="group" aria-label="Fix tool">
+                <span className="panel-subtag inspect-tool-grid-label">Fix tool</span>
+                {(Object.keys(fixToolLabels) as FixTool[]).map((entry) => (
+                  <button
+                    key={entry}
+                    type="button"
+                    className={selectedFixTool === entry ? "inspect-tool-tile active-tool" : "inspect-tool-tile"}
+                    onClick={() => setSelectedFixTool(entry)}
+                    disabled={fixPhase === "mini_game"}
+                  >
+                    {fixToolLabels[entry]}
+                  </button>
+                ))}
+              </div>
+            </>
+          ) : (
+            <>
+              <label className="tool-select">
+                <span className="panel-subtag">Viewing tool</span>
+                <select value={tool} onChange={(event) => setTool(event.target.value as InspectionTool)} className="a11y-select">
+                  {(Object.keys(toolLabels) as InspectionTool[]).map((entry) => (
+                    <option key={entry} value={entry}>
+                      {toolLabels[entry]}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="tool-select">
+                <span className="panel-subtag">Fix tool</span>
+                <select
+                  value={selectedFixTool}
+                  onChange={(event) => setSelectedFixTool(event.target.value as FixTool)}
+                  className="a11y-select"
+                  disabled={fixPhase === "mini_game"}
+                >
+                  {(Object.keys(fixToolLabels) as FixTool[]).map((entry) => (
+                    <option key={entry} value={entry}>
+                      {fixToolLabels[entry]}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </>
+          )}
           <button type="button" onClick={resetView}>
             Reset View
           </button>
           <button type="button" onClick={() => setOffset({ x: 0, y: 0 })}>
             Recenter
           </button>
+          {isVrUi ? (
+            <button
+              type="button"
+              className={vrPanMode ? "active-tool" : ""}
+              onClick={() => setVrPanMode((v) => !v)}
+              aria-pressed={vrPanMode}
+            >
+              {vrPanMode ? "Pan mode on" : "Pan mode off"}
+            </button>
+          ) : null}
         </div>
-        <div className="inspect-grid">
+        <div className={`inspect-grid${isVrUi ? " inspect-grid--xr" : ""}`}>
           <div
-            className={`inspect-viewport ${isRepairInteractionLocked ? "inspect-viewport-repair-mode" : ""}`}
+            className={`inspect-viewport ${isRepairInteractionLocked ? "inspect-viewport-repair-mode" : ""}${isVrUi ? " inspect-viewport--xr" : ""}`}
+            style={isVrUi ? ({ touchAction: "none" } as CSSProperties) : undefined}
             onWheel={(event) => {
               if (isRepairInteractionLocked) return;
               event.preventDefault();
               const delta = event.deltaY > 0 ? -0.05 : 0.05;
               setZoom((v) => Math.min(2.4, Math.max(0.8, v + delta)));
             }}
-            onMouseDown={(event) => {
-              if (isRepairInteractionLocked) return;
-              dragRef.current = { x: event.clientX, y: event.clientY };
-            }}
-            onMouseUp={() => {
-              dragRef.current = null;
-            }}
-            onMouseLeave={() => {
-              dragRef.current = null;
-              setParallax({ x: 0, y: 0 });
-            }}
-            onMouseMove={(event) => {
-              const rect = event.currentTarget.getBoundingClientRect();
-              const normX = (event.clientX - rect.left) / Math.max(1, rect.width) - 0.5;
-              const normY = (event.clientY - rect.top) / Math.max(1, rect.height) - 0.5;
-              setParallax({ x: normX * 10, y: normY * 8 });
-              if (isRepairInteractionLocked) return;
-              if (!dragRef.current) return;
-              const dx = event.clientX - dragRef.current.x;
-              const dy = event.clientY - dragRef.current.y;
-              dragRef.current = { x: event.clientX, y: event.clientY };
-              if (event.shiftKey) {
-                setOffset((prev) => ({ x: prev.x + dx * 0.25, y: prev.y + dy * 0.25 }));
-              } else {
-                setRotation((prev) => ({ x: prev.x + dy * 0.16, y: prev.y + dx * 0.16 }));
+            onPointerDown={onViewportPointerDown}
+            onPointerMove={onViewportPointerMove}
+            onPointerUp={onViewportPointerUp}
+            onPointerCancel={onViewportPointerUp}
+            onPointerLeave={(event) => {
+              if (!pointerDragRef.current || pointerDragRef.current.pointerId !== event.pointerId) {
+                setParallax({ x: 0, y: 0 });
               }
             }}
           >
             <div className="inspect-zoom-pad">
-              <button type="button" onClick={() => setZoom((v) => Math.max(0.8, v - 0.1))}>
-                -
+              <button type="button" aria-label="Zoom out" onClick={() => setZoom((v) => Math.max(0.8, v - 0.1))}>
+                −
               </button>
-              <button type="button" onClick={() => setZoom((v) => Math.min(2.4, v + 0.1))}>
+              <button type="button" aria-label="Zoom in" onClick={() => setZoom((v) => Math.min(2.4, v + 0.1))}>
                 +
               </button>
             </div>
+            {isVrUi ? (
+              <div className="inspect-vr-nudges" aria-label="Wafer view nudge controls">
+                <button type="button" onClick={() => setRotation((p) => ({ ...p, y: p.y - 14 }))} aria-label="Rotate left">
+                  ↺
+                </button>
+                <button type="button" onClick={() => setRotation((p) => ({ ...p, y: p.y + 14 }))} aria-label="Rotate right">
+                  ↻
+                </button>
+                <button type="button" onClick={() => setRotation((p) => ({ ...p, x: Math.min(55, p.x + 10) }))} aria-label="Tilt down">
+                  ↓
+                </button>
+                <button type="button" onClick={() => setRotation((p) => ({ ...p, x: Math.max(-55, p.x - 10) }))} aria-label="Tilt up">
+                  ↑
+                </button>
+              </div>
+            ) : null}
             <div
               className={`wafer-model ${canRevealDefect ? "defect-visible" : ""}`}
               style={waferStyle}
@@ -557,13 +512,13 @@ export function InspectionModal() {
             ) : null}
           </div>
         </div>
-        <div className="inspect-footer">
+        <div className={`inspect-footer${isVrUi ? " inspect-footer--xr" : ""}`}>
           <p className="status-chip status-warn">
             {canRevealDefect
               ? "Evidence present. Validate in multiple views before final disposition."
               : "Insufficient evidence. Adjust angle, zoom, and tool to continue investigation."}
           </p>
-          <div style={{ display: "flex", gap: "0.5rem" }}>
+          <div className={`inspect-footer-actions${isVrUi ? " inspect-footer-actions--xr" : ""}`}>
             <button
               type="button"
               onClick={() => {
@@ -601,8 +556,8 @@ export function InspectionModal() {
         {fixMiniGameError ? <p className="status-chip status-bad">{fixMiniGameError}</p> : null}
       </div>
       {isFixQuizOpen ? (
-        <div className="fix-quiz-overlay" role="dialog" aria-modal="true" aria-labelledby="fix-quiz-title">
-          <div className="fix-quiz-card">
+        <div className={`fix-quiz-overlay${isVrUi ? " fix-quiz-overlay--xr" : ""}`} role="dialog" aria-modal="true" aria-labelledby="fix-quiz-title">
+          <div className={`fix-quiz-card${isVrUi ? " fix-quiz-card--xr" : ""}`}>
             <h3 id="fix-quiz-title">Manual Fix Verification</h3>
             <p>
               Case brief: {allDefects.map((defect) => defect.defectClass).join(", ")} | Severity {wafer.severity}/3 | Load {wafer.defectLoad}/5.
@@ -615,7 +570,13 @@ export function InspectionModal() {
                   <button
                     key={entry}
                     type="button"
-                    className={quizAnswers.tool === entry ? "active-tool quiz-option-selected" : ""}
+                    className={[
+                      "fix-quiz-option",
+                      isVrUi ? "fix-quiz-option--xr" : "",
+                      quizAnswers.tool === entry ? "active-tool quiz-option-selected" : ""
+                    ]
+                      .filter(Boolean)
+                      .join(" ")}
                     onClick={() => setQuizAnswers((prev) => ({ ...prev, tool: entry }))}
                   >
                     {fixToolLabels[entry]}
@@ -630,8 +591,15 @@ export function InspectionModal() {
                   <button
                     key={option.id}
                     type="button"
-                    className={quizAnswers.mechanism === option.id ? "quiz-option-selected" : ""}
+                    className={[
+                      "fix-quiz-option",
+                      isVrUi ? "fix-quiz-option--xr" : "",
+                      quizAnswers.mechanism === option.id ? "quiz-option-selected" : ""
+                    ]
+                      .filter(Boolean)
+                      .join(" ")}
                     onClick={() => setQuizAnswers((prev) => ({ ...prev, mechanism: option.id }))}
+                    title={isVrUi ? option.label : undefined}
                   >
                     {option.label}
                   </button>
@@ -645,8 +613,15 @@ export function InspectionModal() {
                   <button
                     key={option.id}
                     type="button"
-                    className={quizAnswers.sequence === option.id ? "quiz-option-selected" : ""}
+                    className={[
+                      "fix-quiz-option",
+                      isVrUi ? "fix-quiz-option--xr" : "",
+                      quizAnswers.sequence === option.id ? "quiz-option-selected" : ""
+                    ]
+                      .filter(Boolean)
+                      .join(" ")}
                     onClick={() => setQuizAnswers((prev) => ({ ...prev, sequence: option.id }))}
+                    title={isVrUi ? option.label : undefined}
                   >
                     {option.label}
                   </button>
@@ -660,8 +635,15 @@ export function InspectionModal() {
                   <button
                     key={option.id}
                     type="button"
-                    className={quizAnswers.release === option.id ? "quiz-option-selected" : ""}
+                    className={[
+                      "fix-quiz-option",
+                      isVrUi ? "fix-quiz-option--xr" : "",
+                      quizAnswers.release === option.id ? "quiz-option-selected" : ""
+                    ]
+                      .filter(Boolean)
+                      .join(" ")}
                     onClick={() => setQuizAnswers((prev) => ({ ...prev, release: option.id }))}
+                    title={isVrUi ? option.label : undefined}
                   >
                     {option.label}
                   </button>
@@ -670,7 +652,13 @@ export function InspectionModal() {
             </div>
             {quizError ? <p className="status-chip status-bad">{quizError}</p> : null}
             <div className="tutorial-actions">
-              <button type="button" onClick={() => setIsFixQuizOpen(false)}>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsFixQuizOpen(false);
+                  cancelFixQuiz();
+                }}
+              >
                 Cancel
               </button>
               <button type="button" onClick={submitFixQuiz}>
@@ -681,8 +669,8 @@ export function InspectionModal() {
         </div>
       ) : null}
       {fixPhase === "mini_game" ? (
-        <div className="fix-mini-game-overlay" role="dialog" aria-modal="true" aria-labelledby="fix-minigame-title">
-          <div className="fix-mini-game-card">
+        <div className={`fix-mini-game-overlay${isVrUi ? " fix-mini-game-overlay--xr" : ""}`} role="dialog" aria-modal="true" aria-labelledby="fix-minigame-title">
+          <div className={`fix-mini-game-card${isVrUi ? " fix-mini-game-card--xr" : ""}`}>
             <h3 id="fix-minigame-title">Manual Fix Simulation</h3>
             <FixMiniGameHost />
           </div>
