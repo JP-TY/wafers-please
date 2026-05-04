@@ -124,6 +124,154 @@ export function registerAFrameComponents(): void {
     }
   });
 
+  const DESKTOP_MOVE_KEYS = new Set([
+    "KeyW",
+    "KeyA",
+    "KeyS",
+    "KeyD",
+    "ArrowUp",
+    "ArrowLeft",
+    "ArrowRight",
+    "ArrowDown"
+  ]);
+
+  function shouldCaptureDesktopKeys(event: KeyboardEvent): boolean {
+    const target = event.target;
+    if (!target || !(target instanceof HTMLElement)) return true;
+    if (target.isContentEditable) return false;
+    const tag = target.tagName;
+    return tag !== "INPUT" && tag !== "TEXTAREA" && tag !== "SELECT";
+  }
+
+  /** Replaces stock `wasd-controls` on the rig: uses camera yaw + capped speed (rig rotation stays 0). */
+  AFRAME.registerComponent("desktop-rig-locomotion", {
+    schema: {
+      enabled: { type: "boolean", default: true },
+      maxSpeed: { type: "number", default: 0.32 },
+      acceleration: { type: "number", default: 4.2 },
+      friction: { type: "number", default: 14 }
+    },
+    init() {
+      const self = this as {
+        data: { enabled: boolean; maxSpeed: number; acceleration: number; friction: number };
+        el: {
+          sceneEl?: { is: (state: string) => boolean };
+          object3D: { position: { x: number; z: number } };
+          querySelector: (sel: string) => { object3D: { rotation: { y: number } } } | null;
+        };
+        keys: Record<string, boolean>;
+        velX: number;
+        velZ: number;
+        onKeyDown: (e: KeyboardEvent) => void;
+        onKeyUp: (e: KeyboardEvent) => void;
+      };
+      self.keys = {};
+      self.velX = 0;
+      self.velZ = 0;
+      self.onKeyDown = (e: KeyboardEvent) => {
+        if (!shouldCaptureDesktopKeys(e)) return;
+        const code = e.code;
+        if (code && DESKTOP_MOVE_KEYS.has(code)) {
+          self.keys[code] = true;
+        }
+      };
+      self.onKeyUp = (e: KeyboardEvent) => {
+        const code = e.code;
+        if (code && DESKTOP_MOVE_KEYS.has(code)) {
+          delete self.keys[code];
+        }
+      };
+      window.addEventListener("keydown", self.onKeyDown);
+      window.addEventListener("keyup", self.onKeyUp);
+    },
+    tick(_time: number, dt: number) {
+      const self = this as {
+        data: { enabled: boolean; maxSpeed: number; acceleration: number; friction: number };
+        el: {
+          sceneEl?: { is: (state: string) => boolean };
+          object3D: { position: { x: number; z: number } };
+          querySelector: (sel: string) => { object3D: { rotation: { y: number } } } | null;
+        };
+        keys: Record<string, boolean>;
+        velX: number;
+        velZ: number;
+      };
+      if (!self.data.enabled) {
+        self.velX = 0;
+        self.velZ = 0;
+        return;
+      }
+      const sceneEl = self.el.sceneEl;
+      if (!sceneEl || sceneEl.is("vr-mode")) {
+        self.velX = 0;
+        self.velZ = 0;
+        return;
+      }
+      const cam = self.el.querySelector("[camera]");
+      if (!cam) return;
+
+      const secs = Math.min(dt / 1000, 0.08);
+      const yaw = cam.object3D.rotation.y;
+      const sin = Math.sin(yaw);
+      const cos = Math.cos(yaw);
+      const forwardX = sin;
+      const forwardZ = -cos;
+      const rightX = cos;
+      const rightZ = sin;
+
+      const k = self.keys;
+      let ix = 0;
+      let iz = 0;
+      if (k.KeyW || k.ArrowUp) {
+        ix += forwardX;
+        iz += forwardZ;
+      }
+      if (k.KeyS || k.ArrowDown) {
+        ix -= forwardX;
+        iz -= forwardZ;
+      }
+      if (k.KeyD || k.ArrowRight) {
+        ix += rightX;
+        iz += rightZ;
+      }
+      if (k.KeyA || k.ArrowLeft) {
+        ix -= rightX;
+        iz -= rightZ;
+      }
+
+      const mag = Math.hypot(ix, iz);
+      const { maxSpeed, acceleration, friction } = self.data;
+
+      if (mag < 1e-6) {
+        const decay = Math.exp(-friction * secs);
+        self.velX *= decay;
+        self.velZ *= decay;
+        if (Math.hypot(self.velX, self.velZ) < 1e-5) {
+          self.velX = 0;
+          self.velZ = 0;
+        }
+      } else {
+        const nx = ix / mag;
+        const nz = iz / mag;
+        self.velX += nx * acceleration * secs;
+        self.velZ += nz * acceleration * secs;
+        const sp = Math.hypot(self.velX, self.velZ);
+        if (sp > maxSpeed) {
+          self.velX = (self.velX / sp) * maxSpeed;
+          self.velZ = (self.velZ / sp) * maxSpeed;
+        }
+      }
+
+      self.el.object3D.position.x += self.velX * secs;
+      self.el.object3D.position.z += self.velZ * secs;
+    },
+    remove() {
+      const self = this as { onKeyDown: (e: KeyboardEvent) => void; onKeyUp: (e: KeyboardEvent) => void };
+      window.removeEventListener("keydown", self.onKeyDown);
+      window.removeEventListener("keyup", self.onKeyUp);
+    }
+  });
+
   AFRAME.registerComponent("desktop-look", {
     schema: { sensitivity: { type: "number", default: 0.0016 } },
     init() {
